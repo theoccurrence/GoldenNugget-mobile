@@ -102,7 +102,10 @@ enum TweakKind: Sendable {
 /// one plist, and GoldenNugget iterates `tweaks` in this same order, so a
 /// later key wins exactly as it does upstream.  Do not sort this array.
 enum TweakCatalog {
-    static let all: [TweakSpec] = registry0 + registry1 + registry2 + registry3 + registry4 + registry5 + registry6 + registry7 + registry8 + registry9
+    /// Every registry-defined tweak, in the reference's own order, then the
+    /// fork's own mobile-only rows.  The mobile-only array is separate so the
+    /// reference chunks stay byte-identical to a regeneration.
+    static let all: [TweakSpec] = registry0 + registry1 + registry2 + registry3 + registry4 + registry5 + registry6 + registry7 + registry8 + registry9 + registryMobileOnly
 
     /// The daemon groups, appended after the registry rows.  They are not in
     /// `registry.py` upstream -- `gen-daemons-from-goldennugget.py` emits them
@@ -120,16 +123,57 @@ enum TweakCatalog {
 
 
 extension TweakCatalog {
-    static let siriAIArchives: [String: Data] = [
-        "SiriAI": Data(base64Encoded: "YnBsaXN0MDDUAQIDBAUGBwpYJHZlcnNpb25ZJGFyY2hpdmVyVCR0b3BYJG9iamVjdHMSAAGGoF8QD05TS2V5ZWRBcmNoaXZlctEICVRyb290gAGvEBALDBEdHh8gJCUsLzQ6Ozw/VSRudWxs0g0ODxBbb3ZlcnJpZGVNYXBWJGNsYXNzgAKAD9MSEw4UGBxXTlMua2V5c1pOUy5vYmplY3RzoxUWF4ADgASABaMZGhuABoAJgAqADhB6EJsQYNIhDiIjVmFuc3dlcoAHgAgQBNImJygpWiRjbGFzc25hbWVYJGNsYXNzZXNfEBdFbGlnaWJpbGl0eU92ZXJyaWRlRGF0YaIqK18QF0VsaWdpYmlsaXR5T3ZlcnJpZGVEYXRhWE5TT2JqZWN00iEOIiOAB4AI0yEwDiIyI1djb250ZXh0gAeAC4AI0xITDjU3HKE2gAyhOIANgA5fECtPU19FTElHSUJJTElUWV9DT05URVhUX0xJTldPT0RfQVZBSUxBQklMSVRZEALSJic9PlxOU0RpY3Rpb25hcnmiPSvSJidAQV8QE0VsaWdpYmlsaXR5T3ZlcnJpZGWiQitfEBNFbGlnaWJpbGl0eU92ZXJyaWRlAAgAEQAaACQAKQAyADcASQBMAFEAUwBmAGwAcQB9AIQAhgCIAI8AlwCiAKYAqACqAKwAsACyALQAtgC4ALoAvAC+AMMAygDMAM4A0ADVAOAA6QEDAQYBIAEpAS4BMAEyATkBQQFDAUUBRwFOAVABUgFUAVYBWAGGAYgBjQGaAZ0BogG4AbsAAAAAAAACAQAAAAAAAABDAAAAAAAAAAAAAAAAAAAB0Q==")!,
-        "ResetSiriAIOverrides": Data(base64Encoded: "YnBsaXN0MDDUAQIDBAUGBwpYJHZlcnNpb25ZJGFyY2hpdmVyVCR0b3BYJG9iamVjdHMSAAGGoF8QD05TS2V5ZWRBcmNoaXZlctEICVRyb290gAGlCwwRFx1VJG51bGzSDQ4PEFtvdmVycmlkZU1hcFYkY2xhc3OAAoAE0xITDhQVFldOUy5rZXlzWk5TLm9iamVjdHOgoIAD0hgZGhtaJGNsYXNzbmFtZVgkY2xhc3Nlc1xOU0RpY3Rpb25hcnmiGhxYTlNPYmplY3TSGBkeH18QE0VsaWdpYmlsaXR5T3ZlcnJpZGWiIBxfEBNFbGlnaWJpbGl0eU92ZXJyaWRlCBEaJCkyN0lMUVNZX2Rwd3l7goqVlpeZnqmyv8LL0ObpAAAAAAAAAQEAAAAAAAAAIQAAAAAAAAAAAAAAAAAAAP8=")!,
+    /// The eligibility-override archives this app can deliver, keyed by the
+    /// exact set of enabled operations.
+    ///
+    /// The device holds exactly ONE override map
+    /// (`SysContainerDomain-com.apple.eligibilityd` / `Library/Caches/NeverRestore/
+    /// eligibility_overrides.data`), so two enabled operations cannot each write
+    /// their own file: the set of enabled operations selects one pre-combined
+    /// archive.  `eligibilityCombination(for:)` maps a selection to a key.
+    ///
+    /// Every entry is an opaque `NSKeyedArchive` from Apple's own
+    /// `NSKeyedArchiver` and is never reserialized; the runtime verifies each
+    /// against `eligibilityHashes` before it reaches the device.
+    ///
+    /// Sources: `siri` and `reset` are the Project Linwood archives the desktop
+    /// ships (`siri_ai.HASHES`).  `mirroring` and `siri+mirroring` were produced
+    /// by Project Linwood's `tools/override_archive/make_override_archive.swift`
+    /// on 2026-11-14 for `OS_ELIGIBILITY_DOMAIN_IRON` (27).
+    static let eligibilityArchives: [String: Data] = [
+        "siri": Data(base64Encoded: "YnBsaXN0MDDUAQIDBAUGBwpYJHZlcnNpb25ZJGFyY2hpdmVyVCR0b3BYJG9iamVjdHMSAAGGoF8QD05TS2V5ZWRBcmNoaXZlctEICVRyb290gAGvEBALDBEdHh8gJCUsLzQ6Ozw/VSRudWxs0g0ODxBbb3ZlcnJpZGVNYXBWJGNsYXNzgAKAD9MSEw4UGBxXTlMua2V5c1pOUy5vYmplY3RzoxUWF4ADgASABaMZGhuABoAJgAqADhB6EJsQYNIhDiIjVmFuc3dlcoAHgAgQBNImJygpWiRjbGFzc25hbWVYJGNsYXNzZXNfEBdFbGlnaWJpbGl0eU92ZXJyaWRlRGF0YaIqK18QF0VsaWdpYmlsaXR5T3ZlcnJpZGVEYXRhWE5TT2JqZWN00iEOIiOAB4AI0yEwDiIyI1djb250ZXh0gAeAC4AI0xITDjU3HKE2gAyhOIANgA5fECtPU19FTElHSUJJTElUWV9DT05URVhUX0xJTldPT0RfQVZBSUxBQklMSVRZEALSJic9PlxOU0RpY3Rpb25hcnmiPSvSJidAQV8QE0VsaWdpYmlsaXR5T3ZlcnJpZGWiQitfEBNFbGlnaWJpbGl0eU92ZXJyaWRlAAgAEQAaACQAKQAyADcASQBMAFEAUwBmAGwAcQB9AIQAhgCIAI8AlwCiAKYAqACqAKwAsACyALQAtgC4ALoAvAC+AMMAygDMAM4A0ADVAOAA6QEDAQYBIAEpAS4BMAEyATkBQQFDAUUBRwFOAVABUgFUAVYBWAGGAYgBjQGaAZ0BogG4AbsAAAAAAAACAQAAAAAAAABDAAAAAAAAAAAAAAAAAAAB0Q==")!,
+        "reset": Data(base64Encoded: "YnBsaXN0MDDUAQIDBAUGBwpYJHZlcnNpb25ZJGFyY2hpdmVyVCR0b3BYJG9iamVjdHMSAAGGoF8QD05TS2V5ZWRBcmNoaXZlctEICVRyb290gAGlCwwRFx1VJG51bGzSDQ4PEFtvdmVycmlkZU1hcFYkY2xhc3OAAoAE0xITDhQVFldOUy5rZXlzWk5TLm9iamVjdHOgoIAD0hgZGhtaJGNsYXNzbmFtZVgkY2xhc3Nlc1xOU0RpY3Rpb25hcnmiGhxYTlNPYmplY3TSGBkeH18QE0VsaWdpYmlsaXR5T3ZlcnJpZGWiIBxfEBNFbGlnaWJpbGl0eU92ZXJyaWRlCBEaJCkyN0lMUVNZX2Rwd3l7goqVlpeZnqmyv8LL0ObpAAAAAAAAAQEAAAAAAAAAIQAAAAAAAAAAAAAAAAAAAP8=")!,
+        "mirroring": Data(base64Encoded: "YnBsaXN0MDDUAQIDBAUGBwpYJHZlcnNpb25ZJGFyY2hpdmVyVCR0b3BYJG9iamVjdHMSAAGGoF8QD05TS2V5ZWRBcmNoaXZlctEICVRyb290gAGpCwwRGRoeHyYqVSRudWxs0g0ODxBbb3ZlcnJpZGVNYXBWJGNsYXNzgAKACNMSEw4UFhhXTlMua2V5c1pOUy5vYmplY3RzoRWAA6EXgASABxAb0hsOHB1WYW5zd2VygAWABhAE0iAhIiNaJGNsYXNzbmFtZVgkY2xhc3Nlc18QF0VsaWdpYmlsaXR5T3ZlcnJpZGVEYXRhoiQlXxAXRWxpZ2liaWxpdHlPdmVycmlkZURhdGFYTlNPYmplY3TSICEnKF8QE05TTXV0YWJsZURpY3Rpb25hcnmjJyklXE5TRGljdGlvbmFyedIgISssXxATRWxpZ2liaWxpdHlPdmVycmlkZaItJV8QE0VsaWdpYmlsaXR5T3ZlcnJpZGUACAARABoAJAApADIANwBJAEwAUQBTAF0AYwBoAHQAewB9AH8AhgCOAJkAmwCdAJ8AoQCjAKUAqgCxALMAtQC3ALwAxwDQAOoA7QEHARABFQErAS8BPAFBAVcBWgAAAAAAAAIBAAAAAAAAAC4AAAAAAAAAAAAAAAAAAAFw")!,
+        "siri+mirroring": Data(base64Encoded: "YnBsaXN0MDDUAQIDBAUGBwpYJHZlcnNpb25ZJGFyY2hpdmVyVCR0b3BYJG9iamVjdHMSAAGGoF8QD05TS2V5ZWRBcmNoaXZlctEICVRyb290gAGvEBMLDBEfICEiIycoLzI3PT4/QkVIVSRudWxs0g0ODxBbb3ZlcnJpZGVNYXBWJGNsYXNzgAKAEtMSEw4UGR5XTlMua2V5c1pOUy5vYmplY3RzpBUWFxiAA4AEgAWABqQaGxwdgAeACoALgBCAERB6EBsQYBCb0iQOJSZWYW5zd2VygAiACRAE0ikqKyxaJGNsYXNzbmFtZVgkY2xhc3Nlc18QF0VsaWdpYmlsaXR5T3ZlcnJpZGVEYXRhoi0uXxAXRWxpZ2liaWxpdHlPdmVycmlkZURhdGFYTlNPYmplY3TSJA4lJoAIgAnTJDMOJTUmV2NvbnRleHSACIAMgAnTEhMOODo8oTmADaE7gA6AD18QK09TX0VMSUdJQklMSVRZX0NPTlRFWFRfTElOV09PRF9BVkFJTEFCSUxJVFkQAtIpKkBBXE5TRGljdGlvbmFyeaJALtIkDiUmgAiACdIpKkZHXxATTlNNdXRhYmxlRGljdGlvbmFyeaNGQC7SKSpJSl8QE0VsaWdpYmlsaXR5T3ZlcnJpZGWiSy5fEBNFbGlnaWJpbGl0eU92ZXJyaWRlAAgAEQAaACQAKQAyADcASQBMAFEAUwBpAG8AdACAAIcAiQCLAJIAmgClAKoArACuALAAsgC3ALkAuwC9AL8AwQDDAMUAxwDJAM4A1QDXANkA2wDgAOsA9AEOAREBKwE0ATkBOwE9AUQBTAFOAVABUgFZAVsBXQFfAWEBYwGRAZMBmAGlAagBrQGvAbEBtgHMAdAB1QHrAe4AAAAAAAACAQAAAAAAAABMAAAAAAAAAAAAAAAAAAACBA==")!,
     ]
 
-    /// `siri_ai.HASHES` — sha256 of each embedded archive, verbatim.
-    static let siriAIHashes: [String: String] = [
-        "SiriAI": "4290e93faf86fd4f0d38364d2bb67398d9acb77f637555790c3339ad44f64d17",
-        "ResetSiriAIOverrides": "f9b394804d478874f40eedcade937ab1d4a73773b4c8ed018ce51fb407a00818",
+    /// sha256 of each embedded archive, verbatim.
+    static let eligibilityHashes: [String: String] = [
+        "siri": "4290e93faf86fd4f0d38364d2bb67398d9acb77f637555790c3339ad44f64d17",
+        "mirroring": "fb5eb97de65dd31268303af3282b8e1f5b8f1c7b9bb20ba1eca770e6fa1af05a",
+        "siri+mirroring": "65ad959e0920ea1136d011dd6847df60146d937dcf502aa22f0804812bd32b68",
+        "reset": "f9b394804d478874f40eedcade937ab1d4a73773b4c8ed018ce51fb407a00818",
     ]
+
+    /// The registry ids that write the one override map, in apply order.
+    static let eligibilityOperationIDs = ["SiriAI", "IPhoneMirroring", "ResetSiriAIOverrides"]
+
+    /// The archive key for a set of enabled eligibility operations.
+    ///
+    /// `reset` wins: an empty map is the only combination a reset can mean, and
+    /// the UI already refuses reset alongside either enable operation
+    /// (`exclusiveWith`).  `siri` and `mirroring` combine into the union
+    /// archive, because the one override map has to carry both.
+    static func eligibilityCombination(for ids: [String]) -> String? {
+        guard !ids.isEmpty else { return nil }
+        if ids.contains("ResetSiriAIOverrides") { return "reset" }
+        switch (ids.contains("SiriAI"), ids.contains("IPhoneMirroring")) {
+        case (true, true): return "siri+mirroring"
+        case (true, false): return "siri"
+        case (false, true): return "mirroring"
+        case (false, false): return nil
+        }
+    }
 }
 
 /// Device capabilities generated from desktop device_capabilities.py.

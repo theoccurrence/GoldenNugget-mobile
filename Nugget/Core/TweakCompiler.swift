@@ -234,26 +234,11 @@ enum TweakCompiler {
                 continue
             }
 
-            // Eligibility overrides are NSKeyedArchives, never preference dictionaries.
-            if spec.factory == "SiriAITweak" {
-                if selection.isOn(spec),
-                   !selection.enabled.contains(spec.exclusiveWith ?? ""),
-                   let data = TweakCatalog.siriAIArchives[spec.id],
-                   let dest = TweakDomainMap.split(path: spec.location.rawValue) {
-                    // `siri_ai.payload_file`: refuse a damaged embedded archive
-                    // before it ever reaches the device — the digest must match
-                    // the reference's table, otherwise the bundle is corrupt and
-                    // the tweak is skipped rather than applied half-blind.
-                    let digest = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
-                    guard digest == TweakCatalog.siriAIHashes[spec.id] else {
-                        skipped.append((spec.id, "the embedded Siri AI archive is damaged; reinstall GoldenNugget"))
-                        continue
-                    }
-                    archives.append(TweakPayload(domain: dest.domain, relativePath: dest.relativePath,
-                                                 contents: data, owner: 0))
-                }
-                continue
-            }
+            // Eligibility overrides are NSKeyedArchives, never preference
+            // dictionaries, and they are resolved as a *set* after this loop:
+            // the device keeps exactly one override map, so the combination of
+            // enabled operations — not each spec on its own — picks the file.
+            if spec.factory == "SiriAITweak" { continue }
 
             // `PosterKitOverrides` stages binary edits into the wallpaper
             // archives the pulled PosterBoard container already carries, so
@@ -320,6 +305,38 @@ enum TweakCompiler {
                 dict[spec.key] = selection.value(for: spec).plistObject
             }
             plists[spec.location] = dict
+        }
+
+        // ---- eligibility overrides: one file, one map ---------------------
+        // Every eligibility operation writes the same override archive, so the
+        // exact set of enabled operations selects one pre-combined, pinned
+        // archive instead of racing several writes at the same path.
+        // `TweakCatalog.eligibilityOperationIDs` names the specs; the
+        // combination key and the archives live in the catalog.
+        var eligibilityOn: [String] = []
+        for id in TweakCatalog.eligibilityOperationIDs {
+            guard let spec = TweakCatalog.byID[id], !spec.disabled, !hiddenTweakIDs.contains(id) else { continue }
+            guard selection.isOn(spec) else { continue }
+            guard spec.isCompatible(deviceVersion: deviceVersion, isIPhone: isIPhone, deviceModel: deviceModel) else {
+                skipped.append((id, "not compatible with this device / iOS version"))
+                continue
+            }
+            eligibilityOn.append(id)
+        }
+        if let key = TweakCatalog.eligibilityCombination(for: eligibilityOn),
+           let data = TweakCatalog.eligibilityArchives[key],
+           let dest = TweakDomainMap.split(path: TweakFileLocation.siriAIOverrides.rawValue) {
+            // `siri_ai.payload_file`: refuse a damaged embedded archive before
+            // it ever reaches the device — the digest must match the pinned
+            // table, otherwise the bundle is corrupt and the operation is
+            // skipped rather than applied half-blind.
+            let digest = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+            if digest == TweakCatalog.eligibilityHashes[key] {
+                archives.append(TweakPayload(domain: dest.domain, relativePath: dest.relativePath,
+                                             contents: data, owner: 0))
+            } else {
+                skipped.append((key, "the embedded eligibility archive is damaged; reinstall GoldenNugget"))
+            }
         }
 
         var payloads: [TweakPayload] = archives

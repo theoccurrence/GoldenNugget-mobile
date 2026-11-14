@@ -65,3 +65,38 @@ fixes.
 - Hotload safety rules remain an empty list on mobile: the desktop rules are
   inert examples scoped to desktop build numbers (9.7 exact, 9.3/9.3.1,
   badNews ≤ 9.7.1) and never fired on mobile versioning.
+
+---
+
+# iPhone Mirroring (eligibility override)
+
+New: **Internal Options → iPhone Mirroring (Ineligible Regions)**, a second
+eligibility operation beside **Siri AI (Ineligible Regions)**.
+
+- The EU iPhone Mirroring block is `OS_ELIGIBILITY_DOMAIN_IRON` (enum 27, device
+  classes iPhone and Mac). On iOS the *phone* evaluates its own region check and
+  signs it into the mirroring authentication response, so patching the Mac is not
+  enough on iOS 26+; the domain has to be forced on the device.
+- IRON is a plain answer with no context key, and it lives in the same
+  `os_eligibility` vault as `AMERICIUM` — so it is one more key in the *same*
+  override archive, not a new mechanism.
+- **The device keeps exactly one override map.** `TweakCompiler` therefore
+  resolves the eligibility operations as a set: the exact combination of enabled
+  operations picks one pre-combined, pinned archive
+  (`TweakCatalog.eligibilityArchives`), instead of each spec racing a write to
+  the same path. Siri AI + iPhone Mirroring together write a 700-byte union
+  archive; either alone writes its own; Reset writes the empty map.
+- The two new archives come from Project Linwood's
+  `tools/override_archive/make_override_archive.swift` (2026-11-14, IRON added):
+  `{27}` at 492 bytes and `{27, 96, 122, 155}` at 700 bytes. They are pinned by
+  sha256 exactly like the Siri archives and are never reserialized.
+- Exclusivity is unchanged where it already existed: Reset is mutually exclusive
+  with each enable operation, while Siri AI and iPhone Mirroring can be selected
+  together (that is the union case).
+- `scripts/check-eligibility-overrides.py` compiles the eligibility path for
+  macOS and asserts the whole matrix — no device, no desktop checkout.
+
+Not verified on hardware: the IRON archive has never been delivered to a device,
+and whether the iOS mirroring client reads the IRON domain answer at all (as
+opposed to the App Store storefront directly) is open. `docs/licenses/siri_ai/`
+carries the sources and hashes.

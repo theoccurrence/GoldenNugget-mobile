@@ -84,6 +84,68 @@ SUPPORTED_NAMED_FACTORIES = {
 # initializers keep every per-file compile job bounded; see the module docstring.
 CHUNK_SIZE = 40
 
+# --------------------------------------------------------------------------
+# Mobile-only additions
+# --------------------------------------------------------------------------
+# Rows this fork adds on top of the reference registry.  They are emitted
+# verbatim into `TweakCatalog+RegistryMobileOnly.swift`, so the reference
+# chunks stay byte-identical to a regeneration.
+MOBILE_ONLY_CHUNK = "TweakCatalog+RegistryMobileOnly.swift"
+
+MOBILE_ONLY_ROWS = '''        TweakSpec(
+            id: "IPhoneMirroring",
+            section: .internalOptions,
+            title: "iPhone Mirroring (Ineligible Regions)",
+            location: .siriAIOverrides,
+            key: "IPhoneMirroring",
+            value: .bool(true),
+            kind: .toggle,
+            minValue: 0.0,
+            maxValue: 999.0,
+            step: 1.0,
+            minVersion: "27.0",
+            maxVersion: nil,
+            iphoneOnly: true,
+            ipadOnly: false,
+            disabled: false,
+            detail: "Forces OS_ELIGIBILITY_DOMAIN_IRON (27) eligible. The iPhone evaluates its own mirroring region check locally and signs it into the authentication response, so the Mac-side patch alone is rejected on iOS 26+. Independent of Apple Intelligence; the Mac still needs its own IRON patch.",
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false,
+            showWhenUnavailable: false,
+            factory: "SiriAITweak",
+            offValue: nil,
+            integerBoolean: false,
+            requiresCameraControl: false,
+            requiresActionButton: false,
+            requiresHomeButton: false,
+            requiresAlwaysOn: false,
+            warning: "Requires an unencrypted protective backup and a reboot. The device keeps ONE override map: with Siri AI also selected the combined archive is written, otherwise this replaces ALL existing eligibility overrides. Other builds are untested. Turning this switch off does not undo an applied override; use Reset Siri AI Overrides and apply.",
+            requires: [],
+            exclusiveWith: "ResetSiriAIOverrides",
+            unavailableReason: nil,
+            supportedModels: []
+        ),'''
+
+# `mirroring` and `siri+mirroring` are the IRON (27) eligibility archives,
+# produced by Project Linwood's `tools/override_archive/make_override_archive.swift`
+# on 2026-11-14 and carried here as base64 so a regeneration needs no extra
+# checkout.  `siri` and `reset` still come from desktop's `siri_ai`, so the
+# desktop byte contract is unchanged.  The device keeps exactly ONE override
+# map, hence one archive per combination of enabled operations.
+MOBILE_ONLY_ARCHIVES_B64 = {
+    "mirroring": "YnBsaXN0MDDUAQIDBAUGBwpYJHZlcnNpb25ZJGFyY2hpdmVyVCR0b3BYJG9iamVjdHMSAAGGoF8QD05TS2V5ZWRBcmNoaXZlctEICVRyb290gAGpCwwRGRoeHyYqVSRudWxs0g0ODxBbb3ZlcnJpZGVNYXBWJGNsYXNzgAKACNMSEw4UFhhXTlMua2V5c1pOUy5vYmplY3RzoRWAA6EXgASABxAb0hsOHB1WYW5zd2VygAWABhAE0iAhIiNaJGNsYXNzbmFtZVgkY2xhc3Nlc18QF0VsaWdpYmlsaXR5T3ZlcnJpZGVEYXRhoiQlXxAXRWxpZ2liaWxpdHlPdmVycmlkZURhdGFYTlNPYmplY3TSICEnKF8QE05TTXV0YWJsZURpY3Rpb25hcnmjJyklXE5TRGljdGlvbmFyedIgISssXxATRWxpZ2liaWxpdHlPdmVycmlkZaItJV8QE0VsaWdpYmlsaXR5T3ZlcnJpZGUACAARABoAJAApADIANwBJAEwAUQBTAF0AYwBoAHQAewB9AH8AhgCOAJkAmwCdAJ8AoQCjAKUAqgCxALMAtQC3ALwAxwDQAOoA7QEHARABFQErAS8BPAFBAVcBWgAAAAAAAAIBAAAAAAAAAC4AAAAAAAAAAAAAAAAAAAFw",
+    "siri+mirroring": "YnBsaXN0MDDUAQIDBAUGBwpYJHZlcnNpb25ZJGFyY2hpdmVyVCR0b3BYJG9iamVjdHMSAAGGoF8QD05TS2V5ZWRBcmNoaXZlctEICVRyb290gAGvEBMLDBEfICEiIycoLzI3PT4/QkVIVSRudWxs0g0ODxBbb3ZlcnJpZGVNYXBWJGNsYXNzgAKAEtMSEw4UGR5XTlMua2V5c1pOUy5vYmplY3RzpBUWFxiAA4AEgAWABqQaGxwdgAeACoALgBCAERB6EBsQYBCb0iQOJSZWYW5zd2VygAiACRAE0ikqKyxaJGNsYXNzbmFtZVgkY2xhc3Nlc18QF0VsaWdpYmlsaXR5T3ZlcnJpZGVEYXRhoi0uXxAXRWxpZ2liaWxpdHlPdmVycmlkZURhdGFYTlNPYmplY3TSJA4lJoAIgAnTJDMOJTUmV2NvbnRleHSACIAMgAnTEhMOODo8oTmADaE7gA6AD18QK09TX0VMSUdJQklMSVRZX0NPTlRFWFRfTElOV09PRF9BVkFJTEFCSUxJVFkQAtIpKkBBXE5TRGljdGlvbmFyeaJALtIkDiUmgAiACdIpKkZHXxATTlNNdXRhYmxlRGljdGlvbmFyeaNGQC7SKSpJSl8QE0VsaWdpYmlsaXR5T3ZlcnJpZGWiSy5fEBNFbGlnaWJpbGl0eU92ZXJyaWRlAAgAEQAaACQAKQAyADcASQBMAFEAUwBpAG8AdACAAIcAiQCLAJIAmgClAKoArACuALAAsgC3ALkAuwC9AL8AwQDDAMUAxwDJAM4A1QDXANkA2wDgAOsA9AEOAREBKwE0ATkBOwE9AUQBTAFOAVABUgFZAVsBXQFfAWEBYwGRAZMBmAGlAagBrQGvAbEBtgHMAdAB1QHrAe4AAAAAAAACAQAAAAAAAABMAAAAAAAAAAAAAAAAAAACBA==",
+}
+MOBILE_ONLY_ARCHIVE_HASHES = {
+    "mirroring": "fb5eb97de65dd31268303af3282b8e1f5b8f1c7b9bb20ba1eca770e6fa1af05a",
+    "siri+mirroring": "65ad959e0920ea1136d011dd6847df60146d937dcf502aa22f0804812bd32b68",
+}
+# Write order of the archive table, so a regeneration is deterministic.  This is
+# the order the table is committed in (the two renamed Siri-era entries first,
+# then the fork's additions).
+ARCHIVE_ORDER = ["siri", "reset", "mirroring", "siri+mirroring"]
+
 
 def chunk_name(number: int) -> str:
     return f"TweakCatalog+Registry{number}.swift"
@@ -346,8 +408,39 @@ def emit(main: list[str], chunks: list[tuple[str, list[str]]],
         cw("}")
         chunks.append((chunk_name(number), chunk))
     total = (len(SPECS) + CHUNK_SIZE - 1) // CHUNK_SIZE
+
+    # Mobile-only rows.  This fork's additions have no desktop counterpart, so
+    # they are emitted from the table at the top of this file into their own
+    # chunk and appended to `all`.  Keeping them out of the reference chunks
+    # means those stay byte-identical to a regeneration.
+    mobile = [
+        "// GENERATED FILE — do not edit by hand.",
+        "//",
+        "// Mobile-only rows: registry entries this fork adds on top of GoldenNugget's",
+        "// `src/tweaks/registry.py`.  They have no desktop counterpart, so they are",
+        "// emitted from the generator's own table rather than from the reference.",
+        "// Regenerate all parts with:",
+        "//",
+        "//     scripts/gen-tweaks-from-goldennugget.py [--goldennugget <path>]",
+        "//",
+        "// Kept in their own file so the reference's own chunks stay byte-identical to",
+        "// a regeneration; `TweakCatalog.all` appends this array after `registry9`.",
+        "",
+        "import Foundation",
+        "",
+        "extension TweakCatalog {",
+        "    static let registryMobileOnly: [TweakSpec] = [",
+    ]
+    mobile += MOBILE_ONLY_ROWS.strip("\n").split("\n")
+    mobile += ["    ]", "}"]
+    chunks.append((MOBILE_ONLY_CHUNK, mobile))
+
+    w("    /// Every registry-defined tweak, in the reference's own order, then the")
+    w("    /// fork's own mobile-only rows.  The mobile-only array is separate so the")
+    w("    /// reference chunks stay byte-identical to a regeneration.")
     w("    static let all: [TweakSpec] = "
-      + " + ".join(f"registry{number}" for number in range(total)))
+      + " + ".join(f"registry{number}" for number in range(total))
+      + " + registryMobileOnly")
     w("")
 
     w("    /// The daemon groups, appended after the registry rows.  They are not in")
@@ -371,22 +464,79 @@ def generated_outputs(args, FileLocation, SPECS, Kind, Section) -> dict[str, str
     main: list[str] = []
     chunks: list[tuple[str, list[str]]] = []
     emit(main, chunks, FileLocation, SPECS, Kind, Section)
-    # Preserve the opaque keyed archives byte-for-byte; validate against desktop hashes.
+    # The opaque keyed archives.  `siri` and `reset` come from desktop's
+    # `siri_ai` byte-for-byte (`HASHES` verbatim, the desktop contract);
+    # `mirroring` and `siri+mirroring` are this fork's IRON (27) additions.
     import base64
     from src.tweaks.siri_ai import payload_file, HASHES
-    main += ["", "extension TweakCatalog {", "    static let siriAIArchives: [String: Data] = ["]
-    for name, action in [("SiriAI", "enable"), ("ResetSiriAIOverrides", "reset")]:
-        data = payload_file(action).contents
-        main += [f'        "{name}": Data(base64Encoded: "{base64.b64encode(data).decode()}")!,']
-    main += ["    ]", ""]
-    # `siri_ai.HASHES`: the reference refuses a damaged bundled archive before
-    # it ever reaches the device; the port checks the same digests against the
-    # embedded bytes (`TweakCompiler`'s SiriAI branch).
-    main += ["    /// `siri_ai.HASHES` — sha256 of each embedded archive, verbatim.",
-             "    static let siriAIHashes: [String: String] = ["]
-    for name, _ in [("SiriAI", "enable"), ("ResetSiriAIOverrides", "reset")]:
-        main += [f'        "{name}": "{HASHES["enable" if name == "SiriAI" else "reset"]}",']
-    main += ["    ]", "}"]
+    archives = {
+        "siri": payload_file("enable").contents,
+        "mirroring": base64.b64decode(MOBILE_ONLY_ARCHIVES_B64["mirroring"]),
+        "siri+mirroring": base64.b64decode(MOBILE_ONLY_ARCHIVES_B64["siri+mirroring"]),
+        "reset": payload_file("reset").contents,
+    }
+    hashes = {
+        "siri": HASHES["enable"],
+        "mirroring": MOBILE_ONLY_ARCHIVE_HASHES["mirroring"],
+        "siri+mirroring": MOBILE_ONLY_ARCHIVE_HASHES["siri+mirroring"],
+        "reset": HASHES["reset"],
+    }
+    main += [
+        "",
+        "extension TweakCatalog {",
+        "    /// The eligibility-override archives this app can deliver, keyed by the",
+        "    /// exact set of enabled operations.",
+        "    ///",
+        "    /// The device holds exactly ONE override map",
+        "    /// (`SysContainerDomain-com.apple.eligibilityd` / `Library/Caches/NeverRestore/",
+        "    /// eligibility_overrides.data`), so two enabled operations cannot each write",
+        "    /// their own file: the set of enabled operations selects one pre-combined",
+        "    /// archive.  `eligibilityCombination(for:)` maps a selection to a key.",
+        "    ///",
+        "    /// Every entry is an opaque `NSKeyedArchive` from Apple's own",
+        "    /// `NSKeyedArchiver` and is never reserialized; the runtime verifies each",
+        "    /// against `eligibilityHashes` before it reaches the device.",
+        "    ///",
+        "    /// Sources: `siri` and `reset` are the Project Linwood archives the desktop",
+        "    /// ships (`siri_ai.HASHES`).  `mirroring` and `siri+mirroring` were produced",
+        "    /// by Project Linwood's `tools/override_archive/make_override_archive.swift`",
+        "    /// on 2026-11-14 for `OS_ELIGIBILITY_DOMAIN_IRON` (27).",
+        "    static let eligibilityArchives: [String: Data] = [",
+    ]
+    for name in ARCHIVE_ORDER:
+        main += [f'        "{name}": Data(base64Encoded: "{base64.b64encode(archives[name]).decode()}")!,']
+    main += [
+        "    ]",
+        "",
+        "    /// sha256 of each embedded archive, verbatim.",
+        "    static let eligibilityHashes: [String: String] = [",
+    ]
+    for name in ARCHIVE_ORDER:
+        main += [f'        "{name}": "{hashes[name]}",']
+    main += [
+        "    ]",
+        "",
+        "    /// The registry ids that write the one override map, in apply order.",
+        '    static let eligibilityOperationIDs = ["SiriAI", "IPhoneMirroring", "ResetSiriAIOverrides"]',
+        "",
+        "    /// The archive key for a set of enabled eligibility operations.",
+        "    ///",
+        "    /// `reset` wins: an empty map is the only combination a reset can mean, and",
+        "    /// the UI already refuses reset alongside either enable operation",
+        "    /// (`exclusiveWith`).  `siri` and `mirroring` combine into the union",
+        "    /// archive, because the one override map has to carry both.",
+        "    static func eligibilityCombination(for ids: [String]) -> String? {",
+        "        guard !ids.isEmpty else { return nil }",
+        '        if ids.contains("ResetSiriAIOverrides") { return "reset" }',
+        '        switch (ids.contains("SiriAI"), ids.contains("IPhoneMirroring")) {',
+        '        case (true, true): return "siri+mirroring"',
+        '        case (true, false): return "siri"',
+        '        case (false, true): return "mirroring"',
+        '        case (false, false): return nil',
+        "        }",
+        "    }",
+        "}",
+    ]
     import runpy
     capabilities = runpy.run_path(str(Path(args.goldennugget) / "src/devicemanagement/device_capabilities.py"))
     main += ["", "/// Device capabilities generated from desktop device_capabilities.py.", "enum TweakDeviceCapabilities {"]

@@ -761,7 +761,7 @@ class GoldenNuggetEngine {
         let ios27 = major >= 27 && !dev.forcePartialRestore
         let hasEligibility = payloads.contains { $0.domain == "SysContainerDomain-com.apple.eligibilityd" }
         if hasEligibility && !ios27 {
-            throw GoldenNuggetError("Siri AI overrides require an unencrypted protective backup. Disable forced partial restore and retry.")
+            throw GoldenNuggetError("Eligibility overrides (Siri AI, iPhone Mirroring) require an unencrypted protective backup. Disable forced partial restore and retry.")
         }
         // Reported before the fork, because this number *is* the fork: the
         // branch lines below say where the run went, this says why.
@@ -791,7 +791,7 @@ class GoldenNuggetEngine {
                 let data = try Data(contentsOf: manifestURL)
                 let manifest = try PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any]
                 guard manifest?["IsEncrypted"] as? Bool == false else {
-                    throw GoldenNuggetError("Siri AI overrides require a confirmed unencrypted protective backup. Disable local backup encryption in Finder/iTunes and retry.")
+                    throw GoldenNuggetError("Eligibility overrides (Siri AI, iPhone Mirroring) require a confirmed unencrypted protective backup. Disable local backup encryption in Finder/iTunes and retry.")
                 }
             }
             prune = true
